@@ -5,6 +5,7 @@ import string
 import re
 import pandas as pds
 import random
+from nltk.corpus import wordnet
 date_word_list=['jan', 'feb', 'mar', 'apr','may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 
                 'mon', 'tue', 'wed', 'thu','fri', 'sat', 'sun']
 except_word_list=['fail', 'expected','disabled', 'old', 'new','group','address', 'warnings', 'output']
@@ -63,6 +64,8 @@ def read_log_files(file_path='.'):
     file_list = os.listdir(file_path)
     excel_list=[]
     for file in file_list[:]:
+        if file.endswith('log'):
+            continue
         if not file.endswith('txt') and not file.startswith('messages'):
             file_list.remove(file)
             if file.endswith('xlsx'):
@@ -98,7 +101,8 @@ def make_dict(log_data):
     for word in list(log_dict.keys())[:]:
         if log_dict[word]<3 and not word in except_word_list:
             del log_dict[word]
-    del log_dict['/']
+    if '/' in log_dict:
+        del log_dict['/']
 
     for word in date_word_list:
         if word in log_dict:
@@ -111,7 +115,16 @@ def make_dict(log_data):
     print('\n########################################')
     print('Here are most frequent vocabularies.')
     print(sorted_log_dict[:10])
-    return log_dict
+    synant_dict={x[0] : [set([]),set([])] for x in sorted_log_dict} #first list is for synonym, second list is for antonym
+    for i in range(len(sorted_log_dict)):
+        for syn in wordnet.synsets(sorted_log_dict[i][0]):
+            for l in syn.lemmas():
+                if l.name() in synant_dict and l.name()!=sorted_log_dict[i][0]:
+                    synant_dict[sorted_log_dict[i][0]][0].add(l.name())
+                if l.antonyms():
+                    if l.antonyms()[0].name() in synant_dict:
+                        synant_dict[sorted_log_dict[i][0]][1].add(l.antonyms()[0].name())
+    return log_dict, synant_dict
 
 ##########################
 # 2. Log pattern parsing #
@@ -202,7 +215,27 @@ def edit_dist(pattern1, pattern2):
                 dp[i][j]=min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])+1
     return dp[-1][-1]
 
-def classify_pattern_to_events(log_patterns):
+#Edit distance with synonym and antonym
+def edit_dist_synatn(pattern1, pattern2,synant_dict):
+    dp=[[0]*(len(pattern2)+1) for _ in range(len(pattern1)+1)]
+    for i in range(1, len(pattern1)+1):
+        dp[i][0]=i
+    for i in range(1, len(pattern2)+1):
+        dp[0][i]=i
+    for i in range(1,len(pattern1)+1):
+        for j in range(1,len(pattern2)+1):
+            if pattern1[i-1]==pattern2[j-1] or pattern1[i-1] in synant_dict \
+                and pattern2[j-1] in synant_dict[pattern1[i-1]][0]:
+                dp[i][j]=dp[i-1][j-1]
+            elif pattern1[i-1] in synant_dict and pattern2[j-1] in synant_dict[pattern1[i-1]][1]:
+                dp[i][j]=dp[i-1][j-1]+4
+                
+            else:
+                dp[i][j]=min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])+1
+    return dp[-1][-1]
+
+def classify_pattern_to_events(log_patterns, use_synant=None):
+    edit_algo=lambda x,y:edit_dist_synatn(x,y,use_synant) if use_synant else edit_dist
     event_list=[]
     for single_pattern in log_patterns[2:]:
         find_event=False
@@ -210,8 +243,8 @@ def classify_pattern_to_events(log_patterns):
             ed_sum=0
             ed_min=100
             for tmp_pattern in single_event:
-                ed_sum+=edit_dist(tmp_pattern,single_pattern[0])
-                ed_min=min(edit_dist(tmp_pattern,single_pattern[0]), ed_min)
+                ed_sum+=edit_algo(tmp_pattern,single_pattern[0])
+                ed_min=min(edit_algo(tmp_pattern,single_pattern[0]), ed_min)
             if ed_sum/len(single_event)/len(single_pattern[0])<0.5:
             #if ed_min/len(single_pattern[0])<0.5:
                 event_list[i].append(single_pattern[0])
@@ -227,8 +260,8 @@ def classify_pattern_to_events(log_patterns):
                 if single_event==solo_event:
                     continue
                 for tmp_pattern in single_event:
-                    ed_sum+=edit_dist(tmp_pattern,solo_event[0])
-                    ed_min=min(edit_dist(tmp_pattern,solo_event[0]), ed_min)
+                    ed_sum+=edit_algo(tmp_pattern,solo_event[0])
+                    ed_min=min(edit_algo(tmp_pattern,solo_event[0]), ed_min)
                 if ed_sum/len(single_event)/len(solo_event[0])<=0.5:
                 #if ed_min/len(solo_event[0])<=0.5:
                     event_list[i].append(solo_event[0])

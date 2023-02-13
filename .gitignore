@@ -1,6 +1,7 @@
 __pycache__/
 SNIC\ Log/
+log_dpnm_tb/
 *.txt
 *.xlsx
-
+*.log
 

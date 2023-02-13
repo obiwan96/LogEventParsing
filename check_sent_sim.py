@@ -7,7 +7,7 @@ if __name__ == '__main__':
     log_data.extend(read_log_files('SNIC Log/1st'))
     log_data.extend(read_log_files('SNIC Log/2nd'))
     print(f'##Read total {len(log_data)} num of logs##')
-    log_dict=make_dict(log_data)
+    log_dict, _=make_dict(log_data)
     log_patterns=make_log_pattern_dict(log_data, log_dict)
 
     # BERT
