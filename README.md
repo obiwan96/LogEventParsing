@@ -4,7 +4,7 @@ This is a part of DPNM-SNIC project for log anaomaly detection.
 
 We will use log event parser to detect anomaly logs in logs.
 
-     - SNIC_log_reading_and_parsing.py 
+     - log_parser_lib.py 
         : have functions for parsing
      - check_sent_sim.py
         : check sentence similarity of parsed event form based on Sentence BERT

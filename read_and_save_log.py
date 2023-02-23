@@ -1,4 +1,4 @@
-from SNIC_log_reading_and_parsing import *
+from log_parser_lib import *
 import os
 import string
 import re
@@ -19,8 +19,9 @@ if __name__ == '__main__':
     event_list=classify_pattern_to_events(log_patterns,synant_dict)
     print(f'Save logs events')
     with open(log_path+'/'+'evnet_list.txt', 'w') as f:
-        for single_event in event_list:
+        for i, single_event in enumerate(event_list):
             f.write('-------------------------------------------------------------'+'\n')
+            f.write(str(i+1)+'\n')
             for single_pattern in single_event:
                 f.write(' '.join(single_pattern)+'\n')
     new_log_path='../log_dpnm_tb/after_preprocessing'

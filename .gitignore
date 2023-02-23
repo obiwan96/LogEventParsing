@@ -4,4 +4,5 @@ log_dpnm_tb/
 *.txt
 *.xlsx
 *.log
-
+*.png
+*.gv

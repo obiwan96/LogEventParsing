@@ -42,7 +42,6 @@ def read_file(file):
             except:
                 print('read ' + file + ' failed')
                 return []
-
     log_data=[]
     for sentence in text.split('\n'):
         #print(sentence)
@@ -53,7 +52,8 @@ def read_file(file):
             # Previous log is continueing
             log_data[-1]['log']+=sentence
             continue
-        # Do not know what's meaning of number between date and application name.
+        # The number between date and application name is log level. 
+        # We remove it in now.
         # ex) [3], [4] 
         single_log['application']=sentence[sentence.find('%')+1:sentence.find(':',15)]
         single_log['log']=sentence[sentence.find(':',15)+2:]
@@ -237,7 +237,7 @@ def edit_dist_synatn(pattern1, pattern2,synant_dict):
 def classify_pattern_to_events(log_patterns, use_synant=None):
     edit_algo=lambda x,y:edit_dist_synatn(x,y,use_synant) if use_synant else edit_dist
     event_list=[]
-    for single_pattern in log_patterns[2:]:
+    for single_pattern in log_patterns[:]:
         find_event=False
         for i, single_event in enumerate(event_list):
             ed_sum=0
