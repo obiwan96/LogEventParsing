@@ -8,6 +8,12 @@ We will use log event parser to detect anomaly logs in logs.
         : have functions for parsing
      - check_sent_sim.py
         : check sentence similarity of parsed event form based on Sentence BERT
+     - event_FSA.py
+        : Build dictionary, event list and FSA. Save in 'data.pkl'
+     - put_new_log_to_fsa.py
+        : check new log exist in DB and log event transition is valid with FSA
+     - read_and_save_log.py
+        : read logs and combine logs to 'all.log'
     
 ex)
 
@@ -41,3 +47,5 @@ process nbr on tengi/ from full to down neighbor down inactivitytimer : 3.785300
 [path] wake up x/x : 3.9372076988220215
 imi error checking is ok : 3.9435954093933105
 ```
+
+![FSA example](DFA_for_all.gv.png)

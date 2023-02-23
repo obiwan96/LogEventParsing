@@ -66,6 +66,8 @@ def read_log_files(file_path='.'):
     for file in file_list[:]:
         if file.endswith('log'):
             continue
+        if file.startswith('SNIC'):
+            file_list.remove(file)
         if not file.endswith('txt') and not file.startswith('messages'):
             file_list.remove(file)
             if file.endswith('xlsx'):
@@ -78,7 +80,7 @@ def read_log_files(file_path='.'):
         log_data.extend(tmp_log_data)
     for file in excel_list:
         #print(file)
-        df = pds.read_excel(file,header=None, engine='openpyxl')
+        df = pds.read_excel(file_path+'/'+file,header=None, engine='openpyxl')
         for column in df.columns:
             li=df[column].dropna().values.tolist()
             for sentence in li:
@@ -101,8 +103,8 @@ def make_dict(log_data):
     for word in list(log_dict.keys())[:]:
         if log_dict[word]<3 and not word in except_word_list:
             del log_dict[word]
-    if '/' in log_dict:
-        del log_dict['/']
+        elif word.startswith('/'):
+            del log_dict[word]
 
     for word in date_word_list:
         if word in log_dict:
@@ -144,17 +146,21 @@ def log_parser(single_log_data, log_dict):
         sentence_words=re.sub(r'[0-9]+','',single_log_data['log'][single_log_data['log'].find(' ',10):]
                              ).lower().translate(translator).split()
     for word in sentence_words:
-        if word in log_dict:
+        if word=='x' or word.startswith('ff'):
+            single_pattern.append('[number]')
+        elif not len(single_pattern)==0 and single_pattern[-1]=='interface':
+            single_pattern.append(interface)
+        elif word in log_dict:
             single_pattern.append(word)
         elif word in date_word_list:
             single_pattern.append(date)
         elif word in loc_word_list:
             single_pattern.append(loc)
         elif word.startswith('/'):
-            single_pattern.append(date)
+            single_pattern.append(file_path)
         else:
             if len(single_pattern)==0:
-                single_pattern.append(file_path)
+                single_pattern.append(unk)
             elif not single_pattern[-1] == unk:
                 single_pattern.append(unk)
     single_pattern=tuple(single_pattern)
@@ -234,48 +240,45 @@ def edit_dist_synatn(pattern1, pattern2,synant_dict):
                 dp[i][j]=min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])+1
     return dp[-1][-1]
 
-def classify_pattern_to_events(log_patterns, use_synant=None):
-    edit_algo=lambda x,y:edit_dist_synatn(x,y,use_synant) if use_synant else edit_dist
+def classify_pattern_to_events(log_patterns, use_synant=None,print_resuts=False):
     event_list=[]
     for single_pattern in log_patterns[:]:
-        find_event=False
-        for i, single_event in enumerate(event_list):
-            ed_sum=0
-            ed_min=100
-            for tmp_pattern in single_event:
-                ed_sum+=edit_algo(tmp_pattern,single_pattern[0])
-                ed_min=min(edit_algo(tmp_pattern,single_pattern[0]), ed_min)
-            if ed_sum/len(single_event)/len(single_pattern[0])<0.5:
-            #if ed_min/len(single_pattern[0])<0.5:
-                event_list[i].append(single_pattern[0])
-                find_event=True
-                break
+        find_event, event_list = put_new_pattern_to_event_list(single_pattern[0], event_list, use_synant)
         if not find_event:
             event_list.append([single_pattern[0]])
     for solo_event in event_list[:]:
         if len(solo_event)==1:
-            for i, single_event in enumerate(event_list):
-                ed_sum=0
-                ed_min=100
-                if single_event==solo_event:
-                    continue
-                for tmp_pattern in single_event:
-                    ed_sum+=edit_algo(tmp_pattern,solo_event[0])
-                    ed_min=min(edit_algo(tmp_pattern,solo_event[0]), ed_min)
-                if ed_sum/len(single_event)/len(solo_event[0])<=0.5:
-                #if ed_min/len(solo_event[0])<=0.5:
-                    event_list[i].append(solo_event[0])
-                    event_list.remove(solo_event)
-                    break
+            find_event, event_list = put_new_pattern_to_event_list(solo_event[0], event_list, use_synant)
+            if find_event:
+                event_list.remove(solo_event)
     print('\n########################################')
     print(f'Total num of event is {len(event_list)}')
     print(f'Total num of log pattern is {sum(len(single_event) for single_event in event_list)}')
-    for single_event in event_list:
-        print('-------------------------------------------------------------')
-        for single_pattern in single_event:
-            print_pattern(single_pattern)
+    if print_resuts:
+        for single_event in event_list:
+            print('-------------------------------------------------------------')
+            for single_pattern in single_event:
+                print_pattern(single_pattern)
     return event_list
- 
+
+def put_new_pattern_to_event_list(single_pattern, event_list, use_synant=None):
+    edit_algo=lambda x,y:edit_dist_synatn(x,y,use_synant) if use_synant else edit_dist
+    find_event=False
+    for i, single_event in enumerate(event_list):
+        ed_sum=0
+        ed_min=100
+        if single_pattern in single_event:
+            continue
+        for tmp_pattern in single_event:
+            ed_sum+=edit_algo(tmp_pattern,single_pattern)
+            ed_min=min(edit_algo(tmp_pattern,single_pattern), ed_min)
+        if ed_sum/len(single_event)/len(single_pattern)<=0.5:
+        #if ed_min/len(single_pattern[0])<0.5:
+            event_list[i].append(single_pattern)
+            find_event=True
+            break
+    return find_event, event_list
+
 #######################
 # 4. Log event parser #
 #######################
