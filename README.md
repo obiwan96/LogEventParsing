@@ -47,5 +47,6 @@ process nbr on tengi/ from full to down neighbor down inactivitytimer : 3.785300
 [path] wake up x/x : 3.9372076988220215
 imi error checking is ok : 3.9435954093933105
 ```
+next image is example of our FSA.
 
-![FSA example](DFA_for_all.gv.png)
+![FSA example](DFA/DFA_for_all.gv.png)
