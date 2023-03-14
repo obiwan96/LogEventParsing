@@ -7,6 +7,6 @@ log_dpnm_tb/
 *.png
 *.gv
 *.pkl
-DFA/
+!DFA/
+DFA/*
 !DFA/DFA_for_all.gv.png
-
