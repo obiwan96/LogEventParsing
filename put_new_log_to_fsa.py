@@ -19,9 +19,8 @@ if __name__ == '__main__':
         if find_pattern_num(single_pattern,log_patterns) == None:
             find_event, event_list = put_new_pattern_to_event_list(single_pattern, event_list, synant_dict)
             if not find_event:
-                print('******************')
+                print('\n******************')
                 print('Log does not exist in DB : '+single_log['log'] + ' ;\t so we will put in DB')
-                print('******************')
                 event_list.append([single_pattern])
                 newly_added_events_list.append(len(event_list))
             log_patterns.append((single_pattern, 1))
@@ -46,7 +45,7 @@ if __name__ == '__main__':
                 if prev_event_num!=0:
                     print('Prev: '+ ' '.join(event_list[prev_event_num-1][0]) + '    Now: ' 
                     + ' '.join(single_pattern))
-                    print('Prev: '+ single_log['log'] + '    Now: ' + prev_log_message)
+                    print('Prev: '+ prev_log_message + '    Now: ' + single_log['log'])
             if not 'q'+str(event_num) in delta:
                 delta['q'+str(event_num)]={}
             if not str(event_num) in delta['q'+str(prev_event_num)]:
