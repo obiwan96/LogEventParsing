@@ -10,7 +10,7 @@ if __name__ == '__main__':
     (log_dict, synant_dict, log_patterns,event_list),(Q, sigma, delta, initialState, F) = data
     automata1 = DFA(Q, sigma, delta, initialState, F)
     
-    log_path='../anomaly_log'
+    log_path='../anomaly_log/tmp/'
     log_data_=read_log_files(log_path)
     prev_event_num=0
     newly_added_events_list=[]

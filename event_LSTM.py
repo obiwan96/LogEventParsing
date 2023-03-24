@@ -13,22 +13,23 @@ import time
 # event_num will be set in __main__
 event_num=211
 input_dim=40
-hidden_dim=80
+hidden_dim=input_dim*2
 output_dim=event_num
 learning_rate=0.01
-n_epochs=200
+n_epochs=300
 
 # LSTM model.
 # get last input_dim number of event numbers and predict the next event number.
 class lstm_model(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(lstm_model, self).__init__()
-        self.lstm=nn.LSTM(input_dim, hidden_dim, batch_first=True)
+        #input_dim will be sequence length
+        self.lstm=nn.LSTM(1, hidden_dim, batch_first=True)
         self.fc=nn.Linear(hidden_dim, output_dim)
     def forward(self, x):
-        # x = [batch_size, input_dim]
-        x, h=self.lstm(x)
-        x = self.fc(x)
+        # x = [batch_size, input_dim,1]
+        out, h=self.lstm(x.unsqueeze(2))
+        x = self.fc(h[0].squeeze())
         x=F.log_softmax(x,dim=1)
         return x
 
@@ -63,11 +64,17 @@ if __name__ == '__main__':
         log = read_file(log_path+'/'+date+'/all.log')
         for single_log in log:
             single_pattern=log_parser(single_log, log_dict)
-            event_flow.append(find_event_num(single_pattern,event_list))
+            if single_pattern[0] in ['adt', 'fan']:
+                continue
+            log_event_num=find_event_num(single_pattern,event_list)
+            if not log_event_num:
+                print(f'event num not found! {single_log}')
+                continue
+            event_flow.append(log_event_num)
         if len(event_flow)>input_dim:
             for i in range(len(event_flow)-input_dim):
                 input_data.append(event_flow[i:i+input_dim])
-                output_data.append(event_flow[i+input_dim])
+                output_data.append(event_flow[i+input_dim]-1)
     input_data=torch.tensor(input_data,dtype=torch.float32)
     output_data=torch.tensor(output_data)
     #output_data=F.one_hot(output_data,num_classes=event_num)
@@ -76,10 +83,11 @@ if __name__ == '__main__':
     indices=torch.randperm(data_size)
     input_data=input_data[indices]
     output_data=output_data[indices]
-    x_train=input_data[:int(data_size/3)]
-    y_train=output_data[:int(data_size/3)]
-    x_test=input_data[data_size-int(data_size/100):]
-    y_test=output_data[data_size-int(data_size/100):]
+    x_train=input_data[:data_size-int(data_size/10)]
+    y_train=output_data[:data_size-int(data_size/10)]
+    x_test=input_data[data_size-int(data_size/10):]
+    y_test=output_data[data_size-int(data_size/10):]
+    print(f'train data has {len(x_train)} data and test data has {len(x_test)} data')
     dataset = TensorDataset(x_train, y_train)
     dataloader = DataLoader(dataset, batch_size=20000, shuffle=True)
     test_dataset = TensorDataset(x_test, y_test)
@@ -94,6 +102,7 @@ if __name__ == '__main__':
             x_train, y_train = samples
             #print(x_train.shape, y_train.shape)
             prediction=model(x_train)
+            #print(prediction.shape)
             #print(y_train.shape)
             #prediction=torch.argmax(prediction, dim=1)
             #print(prediction.shape)
@@ -112,14 +121,20 @@ if __name__ == '__main__':
             x,y=batch
             with torch.no_grad():
                 prediction=model(x)
-            all_preds +=torch.argmax(prediction,dim=1)
+            #all_preds +=torch.argmax(prediction,dim=1)
+            all_preds += torch.topk(prediction,5,dim=1)[1]
             all_labels += y
         all_preds = torch.stack(all_preds).numpy()
         all_labels = torch.stack(all_labels).numpy()
         assert len(all_preds)==len(all_labels)
         #print(all_preds)
         #print(all_labels)
-        test_accuracy = np.sum(all_preds == all_labels) / len(all_preds)
+        #test_accuracy = np.sum(all_preds == all_labels) / len(all_preds)
+        right_num=0
+        for i, label in enumerate(all_labels):
+            if label in all_preds[i]:
+                right_num+=1.0
+        test_accuracy=right_num/len(all_preds)
         print("Test Accuracy: {0:.3f}".format(test_accuracy))
         writer.add_scalar("Test/Accuracy", test_accuracy,epoch+1)
     writer.close()

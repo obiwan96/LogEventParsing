@@ -174,7 +174,7 @@ def print_pattern(single_pattern):
 def make_log_pattern_dict(log_data, log_dict):
     log_patterns={}
 
-    translator = str.maketrans(string.punctuation , ' '*(len(string.punctuation)))
+    #translator = str.maketrans(string.punctuation , ' '*(len(string.punctuation)))
     for single_log_data in log_data:
         #sentence_words=[words for words in  re.sub(r'[0-9]+','',single_log_data['log']).lower().translate(translator).split()]
         single_pattern=log_parser(single_log_data, log_dict)
@@ -234,7 +234,7 @@ def edit_dist_synatn(pattern1, pattern2,synant_dict):
                 and pattern2[j-1] in synant_dict[pattern1[i-1]][0]:
                 dp[i][j]=dp[i-1][j-1]
             elif pattern1[i-1] in synant_dict and pattern2[j-1] in synant_dict[pattern1[i-1]][1]:
-                dp[i][j]=dp[i-1][j-1]+4
+                dp[i][j]=dp[i-1][j-1]+6
                 
             else:
                 dp[i][j]=min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])+1
