@@ -47,6 +47,8 @@ if __name__ == '__main__':
         for single_log in log_data_:
             single_pattern=log_parser(single_log, log_dict)
             event_num=find_event_num(single_pattern,event_list)
+            if event_num==None:
+                continue
             if not 'q'+str(event_num) in delta:
                 delta['q'+str(event_num)]={}
             if not str(event_num) in delta['q'+str(prev_event_num)]:

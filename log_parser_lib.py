@@ -40,7 +40,7 @@ def read_file(file):
                 with open(file, encoding="ISO-8859-1") as f:
                     text=f.read()
             except:
-                print('read ' + file + ' failed')
+                #print('read ' + file + ' failed')
                 return []
     log_data=[]
     for sentence in text.split('\n'):
@@ -57,6 +57,8 @@ def read_file(file):
         # ex) [3], [4] 
         single_log['application']=sentence[sentence.find('%')+1:sentence.find(':',15)]
         single_log['log']=sentence[sentence.find(':',15)+2:]
+        if single_log['log'].startswith('adt') or  single_log['log'].startswith('FAN'):
+            continue
         log_data.append(single_log)
     return log_data
 

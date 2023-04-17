@@ -8,15 +8,16 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 from log_parser_lib import *
 import time
+import pickle as pkl
 
 # LSTM model hyperparameters
 # event_num will be set in __main__
 event_num=211
-input_dim=40
+input_dim=20
 hidden_dim=input_dim*2
 output_dim=event_num
-learning_rate=0.01
-n_epochs=300
+learning_rate=0.1
+n_epochs=500
 
 # LSTM model.
 # get last input_dim number of event numbers and predict the next event number.
@@ -37,24 +38,12 @@ class lstm_model(nn.Module):
 if __name__ == '__main__':
     log_path='../log_dpnm_tb'
     date_list=os.listdir(log_path)
-    log_data=[]
-    for date in date_list:
-        if os.path.isfile(log_path+'/'+date):
-            continue
-        log_ = read_file(log_path+'/'+date+'/all.log')
-        log_data.extend(log_)
-    print(f'##Read total {len(log_data)} num of logs##')
-    log_path_list=['/mnt/e/obiwan/SNIC Log/1st','/mnt/e/obiwan/SNIC Log/2nd','../1st_example_log']
-    for log_path_ in log_path_list:
-        log_data.extend(read_log_files(log_path_))
-    log_dict, synant_dict=make_dict(log_data)
-    log_patterns=make_log_pattern_dict(log_data, log_dict)
-    event_list=classify_pattern_to_events(log_patterns,synant_dict)
-    print(f'total {len(event_list)} number of events are classified')
+
+    with open('data.pkl','rb') as f:
+        data=pkl.load(f)
+    (log_dict, synant_dict, log_patterns,event_list),(Q, sigma, delta, initialState, F_) = data
     event_num=len(event_list)
-
     model=lstm_model(input_dim, hidden_dim, event_num)
-
     input_data=[]
     output_data=[]
     for date in date_list:
@@ -64,8 +53,6 @@ if __name__ == '__main__':
         log = read_file(log_path+'/'+date+'/all.log')
         for single_log in log:
             single_pattern=log_parser(single_log, log_dict)
-            if single_pattern[0] in ['adt', 'fan']:
-                continue
             log_event_num=find_event_num(single_pattern,event_list)
             if not log_event_num:
                 print(f'event num not found! {single_log}')
@@ -75,6 +62,7 @@ if __name__ == '__main__':
             for i in range(len(event_flow)-input_dim):
                 input_data.append(event_flow[i:i+input_dim])
                 output_data.append(event_flow[i+input_dim]-1)
+    
     input_data=torch.tensor(input_data,dtype=torch.float32)
     output_data=torch.tensor(output_data)
     #output_data=F.one_hot(output_data,num_classes=event_num)
@@ -83,10 +71,10 @@ if __name__ == '__main__':
     indices=torch.randperm(data_size)
     input_data=input_data[indices]
     output_data=output_data[indices]
-    x_train=input_data[:data_size-int(data_size/10)]
-    y_train=output_data[:data_size-int(data_size/10)]
-    x_test=input_data[data_size-int(data_size/10):]
-    y_test=output_data[data_size-int(data_size/10):]
+    x_train=input_data[:data_size-int(data_size/5)]
+    y_train=output_data[:data_size-int(data_size/5)]
+    x_test=input_data[data_size-int(data_size/5):]
+    y_test=output_data[data_size-int(data_size/5):]
     print(f'train data has {len(x_train)} data and test data has {len(x_test)} data')
     dataset = TensorDataset(x_train, y_train)
     dataloader = DataLoader(dataset, batch_size=20000, shuffle=True)
@@ -95,6 +83,7 @@ if __name__ == '__main__':
     # Let's train
     loss_function = nn.NLLLoss()
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+
     writer = SummaryWriter('/home/obiwan/tmp/tensorboard/')
     start=time.time()
     for epoch in range(n_epochs):
@@ -110,33 +99,36 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        print('Epoch {:4d}/{} Batch {}/{} loss: {:.6f}'.format(
-                epoch, n_epochs, batch_idx+1, len(dataloader),loss.item() ))
-        writer.add_scalar("Training/Loss", loss.item(),epoch+1)
-        print('running test..')
-        model.eval()
-        all_preds=[]
-        all_labels=[]
-        for batch in test_dataloader:
-            x,y=batch
-            with torch.no_grad():
-                prediction=model(x)
-            #all_preds +=torch.argmax(prediction,dim=1)
-            all_preds += torch.topk(prediction,5,dim=1)[1]
-            all_labels += y
-        all_preds = torch.stack(all_preds).numpy()
-        all_labels = torch.stack(all_labels).numpy()
-        assert len(all_preds)==len(all_labels)
-        #print(all_preds)
-        #print(all_labels)
-        #test_accuracy = np.sum(all_preds == all_labels) / len(all_preds)
-        right_num=0
-        for i, label in enumerate(all_labels):
-            if label in all_preds[i]:
-                right_num+=1.0
-        test_accuracy=right_num/len(all_preds)
-        print("Test Accuracy: {0:.3f}".format(test_accuracy))
-        writer.add_scalar("Test/Accuracy", test_accuracy,epoch+1)
+        if epoch%50==0:
+            print('Epoch {:4d}/{} Batch {}/{} loss: {:.6f}'.format(
+                    epoch, n_epochs, batch_idx+1, len(dataloader),loss.item() ))
+            writer.add_scalar("Training/Loss", loss.item(),epoch+1)
+            print('running test..')
+            model.eval()
+            all_preds=[]
+            all_labels=[]
+            for batch in test_dataloader:
+                x,y=batch
+                with torch.no_grad():
+                    prediction=model(x)
+                #all_preds +=torch.argmax(prediction,dim=1)
+                all_preds += torch.topk(prediction,5,dim=1)[1]
+                all_labels += y
+            all_preds = torch.stack(all_preds).numpy()
+            all_labels = torch.stack(all_labels).numpy()
+            assert len(all_preds)==len(all_labels)
+            #print(all_preds)
+            #print(all_labels)
+            #test_accuracy = np.sum(all_preds == all_labels) / len(all_preds)
+            right_num=0
+            for i, label in enumerate(all_labels):
+                if label in all_preds[i]:
+                    right_num+=1.0
+            test_accuracy=right_num/len(all_preds)
+            print("Test Accuracy: {0:.3f}".format(test_accuracy))
+            writer.add_scalar("Test/Accuracy", test_accuracy,epoch+1)
     writer.close()
     print(f"Learning takes {(time.time()-start)/60:.2f} minutes")
+    torch.save(model, f'/home/obiwan/tmp/model/input{input_dim}_acc{test_accuracy*100:.0f}.pt')
+    torch.save(model.state_dict(), f'/home/obiwan/tmp/model/input{input_dim}_acc{test_accuracy*100:.0f}_state_dict.pt')
 
