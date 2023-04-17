@@ -27,7 +27,18 @@ ex)
 ```shell
 p4ml> python3 AD_module.py 
 
->>> reading 02_21_overloaded.log file... <<<                                                                                                                                                -----------------------------------------                                                                                                                                                   transition from q11 to q134 does not exist in FSA!                                                                                                                                          Prev: Feb 21 00:04:22PVIDB: Attribute 'cosd.support_xellent_qfx_feature' not present in Db                                                                                                  Now: Feb 21 00:04:22feature cos_fc_defaults num elems 4 rc 0                                                                                                                                -----------------------------------------                                                                                                                                                   transition from q134 to q11 does not exist in FSA!                                                                                                                                          Prev: Feb 21 00:04:22feature cos_fc_defaults num elems 4 rc 0                                                                                                                               Now: Feb 21 00:04:22PVIDB: Attribute 'cosd.support_xellent_qfx_feature' not present in Db                                                                                                   ----------------------------------                                                                                                                                                          LSTM model detects abnormal log continuosly :                                                                                                                                               Feb 21 05:28:03UI_CHILD_STATUS: Cleanup child '/usr/bin/netstat', PID 2937, status 0   
+>>> reading 02_21_overloaded.log file... <<<
+-----------------------------------------
+transition from q11 to q134 does not exist in FSA!
+Prev: Feb 21 00:04:22PVIDB: Attribute 'cosd.support_xellent_qfx_feature' not present in Db
+Now: Feb 21 00:04:22feature cos_fc_defaults num elems 4 rc 0
+-----------------------------------------
+transition from q134 to q11 does not exist in FSA!
+Prev: Feb 21 00:04:22feature cos_fc_defaults num elems 4 rc 0
+Now: Feb 21 00:04:22PVIDB: Attribute 'cosd.support_xellent_qfx_feature' not present in Db
+----------------------------------
+LSTM model detects abnormal log continuosly :
+Feb 21 05:28:03UI_CHILD_STATUS: Cleanup child '/usr/bin/netstat', PID 2937, status 0
 ```
 next image is example of our FSA.
 
