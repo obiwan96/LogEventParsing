@@ -11,11 +11,11 @@ import time
 
 model_name = "bert-base-uncased"
 epsilon = 1e-6
-num_train_epochs = 200
-print_each_n_step = 100
+num_train_epochs = 100
+print_each_n_step = 5
 input_seq=10
 max_token_length=20
-learning_rate=0.1
+learning_rate=0.01
 batch_size=100
 
 # LSTM model.
@@ -68,8 +68,10 @@ if __name__ == '__main__':
     indices=torch.randperm(data_size)
     input_data=input_data[indices]
     output_data=output_data[indices]
-    x_train=input_data[:data_size-int(data_size/5)]
-    y_train=output_data[:data_size-int(data_size/5)]
+    x_train=input_data[:int(data_size/2)]
+    y_train=output_data[:int(data_size/2)]
+    #x_train=input_data[:data_size-int(data_size/5)]
+    #y_train=output_data[:data_size-int(data_size/5)]
     x_test=input_data[data_size-int(data_size/5):]
     y_test=output_data[data_size-int(data_size/5):]
     print(f'train data has {len(x_train)} data and test data has {len(x_test)} data')
@@ -92,63 +94,58 @@ if __name__ == '__main__':
     else:
         device = torch.device("cpu")
     writer = SummaryWriter('/home/dpnm/tmp/tensorboard/')
-    model.train()
-    transformer.train()
     start=time.time()
     for epoch in range(num_train_epochs):
+        model.train()
+        transformer.train()
         for batch_idx, samples in enumerate(dataloader):
             x_train, y_train = samples[0].to(device), samples[1].to(device)
             small_batch_size=x_train.shape[0]
-            print(x_train.shape, y_train.shape)
-            sent_vector=torch.empty(small_batch_size, 0, max_token_length).to(device)
+            #print(x_train.shape, y_train.shape)
+            sent_vector=torch.empty(small_batch_size, 0, BERT_hidden_size).to(device)
             for i in range(input_seq):
-                inp=x_train[:,i,:].squeeze(1)
-                print(inp.shape)
-                out=transformer(inp)
-                print(out.last_hidden_state.shape)
-                out=transformer(x_train[:,i,:].squeeze(1)).last_hidden_state[:,0,:].unsqueeze[1] #only use sentence BERT.
-                print(out.shape)
+                out=transformer(x_train[:,i,:].squeeze(1)).last_hidden_state[:,0,:].unsqueeze(1) #only use sentence BERT.
                 sent_vector=torch.cat((sent_vector,out),1)
-                print(sent_vector.shape)
-            print(sent_vector.shape)
+            #print(sent_vector.shape)
             prediction=model(sent_vector)
             #print(prediction.shape)
+            y_train = transformer(y_train).last_hidden_state[:,0,:]
             #print(y_train.shape)
             #prediction=torch.argmax(prediction, dim=1)
             #print(prediction.shape)
-            loss=loss_function(prediction, y_train)
+            loss=loss_function(prediction, y_train,torch.Tensor(small_batch_size).cuda().fill_(1.0))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        if epoch%50==0:
+        if epoch%print_each_n_step==0:
             print('Epoch {:4d}/{} Batch {}/{} loss: {:.6f}'.format(
                     epoch, num_train_epochs, batch_idx+1, len(dataloader),loss.item() ))
             writer.add_scalar("Training/Loss", loss.item(),epoch+1)
             print('running test..')
+            cos=nn.CosineSimilarity(dim=1)
             model.eval()
+            transformer.eval()
             all_preds=[]
             all_labels=[]
-            for batch in test_dataloader:
-                x,y=batch
-                with torch.no_grad():
-                    prediction=model(x)
-                #all_preds +=torch.argmax(prediction,dim=1)
-                all_preds += torch.topk(prediction,5,dim=1)[1]
-                all_labels += y
-            all_preds = torch.stack(all_preds).numpy()
-            all_labels = torch.stack(all_labels).numpy()
-            assert len(all_preds)==len(all_labels)
-            #print(all_preds)
-            #print(all_labels)
-            #test_accuracy = np.sum(all_preds == all_labels) / len(all_preds)
             right_num=0
-            for i, label in enumerate(all_labels):
-                if label in all_preds[i]:
-                    right_num+=1.0
-            test_accuracy=right_num/len(all_preds)
-            print("Test Accuracy: {0:.3f}".format(test_accuracy))
+            wrong_num=0
+            for batch in test_dataloader:
+                x,y=batch[0].to(device), batch[1].to(device)
+                small_batch_size=x.shape[0]
+                sent_vector=torch.empty(small_batch_size, 0, BERT_hidden_size).to(device)
+                with torch.no_grad():
+                    for i in range(input_seq):
+                        out=transformer(x[:,i,:].squeeze(1)).last_hidden_state[:,0,:].unsqueeze(1)
+                        sent_vector=torch.cat((sent_vector,out),1)
+                    prediction=model(sent_vector)
+                    y = transformer(y).last_hidden_state[:,0,:]
+                small_batch_right=(cos(prediction,y)>1-1e-5).sum()
+                right_num+=small_batch_right
+                wrong_num+=small_batch_size-small_batch_right
+            test_accuracy=right_num/(right_num+wrong_num)
+            print(f"Test Accuracy: {test_accuracy:.3f}. Predict {right_num} through {right_num+wrong_num}")
             writer.add_scalar("Test/Accuracy", test_accuracy,epoch+1)
     writer.close()
     print(f"Learning takes {(time.time()-start)/60:.2f} minutes")
-    torch.save(model, f'/home/obiwan/tmp/model/input{input_dim}_acc{test_accuracy*100:.0f}.pt')
-    torch.save(model.state_dict(), f'/home/obiwan/tmp/model/input{input_dim}_acc{test_accuracy*100:.0f}_state_dict.pt')
+    #torch.save(model, f'/home/obiwan/tmp/model/input{input_dim}_acc{test_accuracy*100:.0f}.pt')
+

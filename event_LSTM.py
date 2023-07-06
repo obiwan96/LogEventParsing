@@ -87,6 +87,7 @@ if __name__ == '__main__':
     writer = SummaryWriter('/home/obiwan/tmp/tensorboard/')
     start=time.time()
     for epoch in range(n_epochs):
+        model.train()
         for batch_idx, samples in enumerate(dataloader):
             x_train, y_train = samples
             #print(x_train.shape, y_train.shape)
