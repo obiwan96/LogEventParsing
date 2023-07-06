@@ -87,7 +87,7 @@ if __name__ == '__main__':
                     print('fsa state no find ')
                     print(single_file_data[0][0])
                 #break
-            if len(model_input)==input_dim:
+            if len(model_input)==input_dim and False:
                 input_data=torch.tensor([model_input[:]],dtype=torch.float32)
                 with torch.no_grad():
                     prediction=model(input_data)

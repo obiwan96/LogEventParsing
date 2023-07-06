@@ -71,7 +71,7 @@ if __name__ == '__main__':
                     delta['q'+str(event_num)]={}
                 if not str(event_num) in delta['q'+str(prev_event_num)]:
                     delta['q'+str(prev_event_num)][str(event_num)]='q'+str(event_num)
-            if len(model_input)==input_dim and not event_num in newly_added_events_list:
+            if False and len(model_input)==input_dim and not event_num in newly_added_events_list:
                 input_data=torch.tensor([model_input[:]],dtype=torch.float32)
                 #print(input_data.shape)
                 with torch.no_grad():

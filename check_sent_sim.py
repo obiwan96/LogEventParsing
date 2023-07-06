@@ -1,12 +1,18 @@
-from SNIC_log_reading_and_parsing import read_log_files, make_dict, make_log_pattern_dict
+from log_parser_lib import *
 from transformers import *
 import torch
 
 if __name__ == '__main__':
-    log_data = read_log_files()
-    log_data.extend(read_log_files('SNIC Log/1st'))
-    log_data.extend(read_log_files('SNIC Log/2nd'))
+    log_path='../log_dpnm_tb'
+    date_list=os.listdir(log_path)
+    log_data=[]
+    for date in date_list:
+        if os.path.isfile(log_path+'/'+date):
+            continue
+        log_ = read_file(log_path+'/'+date+'/all.log')
+        log_data.extend(log_)
     print(f'##Read total {len(log_data)} num of logs##')
+    
     log_dict, _=make_dict(log_data)
     log_patterns=make_log_pattern_dict(log_data, log_dict)
 
@@ -20,7 +26,17 @@ if __name__ == '__main__':
     transformer = AutoModel.from_pretrained(model_name)
     config = AutoConfig.from_pretrained(model_name)
     hidden_size = int(config.hidden_size)
-    transformer.cuda()
+    if torch.cuda.is_available():
+    # Tell PyTorch to use the GPU.
+        device = torch.device("cuda")
+        print('There are %d GPU(s) available.' % torch.cuda.device_count())
+        print('We will use the GPU:', torch.cuda.get_device_name(0))
+    # If not...
+    else:
+        print('No GPU available, using the CPU instead.')
+        device = torch.device("cpu")
+
+    #transformer.cuda()
     transformer.load_state_dict(torch.load(bert_path, map_location=device))
     transformer.eval()
 
