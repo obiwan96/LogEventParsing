@@ -72,8 +72,8 @@ if __name__ == '__main__':
     y_train=output_data[:int(data_size/2)]
     #x_train=input_data[:data_size-int(data_size/5)]
     #y_train=output_data[:data_size-int(data_size/5)]
-    x_test=input_data[data_size-int(data_size/5):]
-    y_test=output_data[data_size-int(data_size/5):]
+    x_test=input_data[data_size-int(data_size/4):]
+    y_test=output_data[data_size-int(data_size/4):]
     print(f'train data has {len(x_train)} data and test data has {len(x_test)} data')
     dataset = TensorDataset(x_train, y_train)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -123,12 +123,15 @@ if __name__ == '__main__':
             writer.add_scalar("Training/Loss", loss.item(),epoch+1)
             print('running test..')
             cos=nn.CosineSimilarity(dim=1)
+            euc_dist=nn.PairwiseDistance()
             model.eval()
             transformer.eval()
             all_preds=[]
             all_labels=[]
             right_num=0
             wrong_num=0
+            euc_right_num=0
+            euc_wrong_num=0
             for batch in test_dataloader:
                 x,y=batch[0].to(device), batch[1].to(device)
                 small_batch_size=x.shape[0]
@@ -139,13 +142,24 @@ if __name__ == '__main__':
                         sent_vector=torch.cat((sent_vector,out),1)
                     prediction=model(sent_vector)
                     y = transformer(y).last_hidden_state[:,0,:]
-                small_batch_right=(cos(prediction,y)>1-1e-5).sum()
+                norm_pred=F.normalize(prediction,dim=1)
+                norm_y=F.normalize(y,dim=1)
+                small_batch_right=(cos(prediction,y)>1-5e-4).sum()
+                small_batch_euc_right=(euc_dist(norm_pred,norm_y)<0.01).sum()
                 right_num+=small_batch_right
                 wrong_num+=small_batch_size-small_batch_right
+                euc_right_num+=small_batch_euc_right
+                euc_wrong_num+=small_batch_size-small_batch_euc_right
             test_accuracy=right_num/(right_num+wrong_num)
+            euc_test_accuracy=euc_right_num/(euc_right_num+euc_wrong_num)
             print(f"Test Accuracy: {test_accuracy:.3f}. Predict {right_num} through {right_num+wrong_num}")
+            print(f"Euc Test Accuracy: {euc_test_accuracy:.3f}. Predict {euc_right_num} through {euc_right_num+euc_wrong_num}")
             writer.add_scalar("Test/Accuracy", test_accuracy,epoch+1)
     writer.close()
     print(f"Learning takes {(time.time()-start)/60:.2f} minutes")
+    torch.save(model, f'/home/dpnm/tmp/model/acc{test_accuracy*100:.0f}.pt')
+    torch.save(model.state_dict(), f'/home/dpnm/tmp/model/acc{test_accuracy*100:.0f}_state_dict.pt')
+    torch.save(transformer, f'/home/dpnm/tmp/model/transformer_acc{test_accuracy*100:.0f}.pt')
+    torch.save(transformer.state_dict(), f'/home/dpnm/tmp/model/transformer_acc{test_accuracy*100:.0f}_state_dict.pt')
     #torch.save(model, f'/home/obiwan/tmp/model/input{input_dim}_acc{test_accuracy*100:.0f}.pt')
 
