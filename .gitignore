@@ -2,6 +2,7 @@ __pycache__/
 SNIC\ Log/
 log_dpnm_tb/
 *.txt
+!requirements.txt
 *.xlsx
 *.log
 *.png
