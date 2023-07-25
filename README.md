@@ -1,5 +1,11 @@
 Log Event Parser for Anomaly Detection
 ===
+Requirements (python3.7)
+```shell
+p4ml> pip install -r requirements.txt
+p4ml> pip install torch torchvision torchaudio tensorboard transformers pytest pandas nltk
+```
+
 This is a part of DPNM-SNIC project for log anaomaly detection.
 
 We will use log event parser to detect anomaly logs in logs.
