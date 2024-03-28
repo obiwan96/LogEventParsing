@@ -188,15 +188,15 @@ def make_log_pattern_dict(log_data, log_dict):
             log_patterns[single_pattern]=1
         else:
             log_patterns[single_pattern]+=1
-    log_patterns=sorted(log_patterns.items(), key=lambda x: x[1], reverse=True)
+    log_patterns_sorted=sorted(log_patterns.items(), key=lambda x: x[1], reverse=True)
     print('\n########################################')
     print('Here are most frequent log patterns')
-    for single_pattern in log_patterns[:10]:
-        print_pattern_with_freq(single_pattern)
+    for log_pattern in log_patterns_sorted[:10]:
+        print_pattern_with_freq(log_pattern)
     print(f'Find {len(log_patterns)} number of log patterns')
 
     ## The result is list!!!! not dict##
-    return log_patterns
+    return list(log_patterns.items())
 
 def find_pattern_num(single_pattern,log_patterns):
     for event_num, log_pattern_element in enumerate(log_patterns):
@@ -274,6 +274,8 @@ def put_new_pattern_to_event_list(single_pattern, event_list, use_synant=None):
         for tmp_pattern in single_event:
             ed_sum+=edit_algo(tmp_pattern,single_pattern)
             ed_min=min(edit_algo(tmp_pattern,single_pattern), ed_min)
+            #ed_sum+=edit_dist_synatn(tmp_pattern,single_pattern,use_synant)
+            #ed_min=min(edit_dist_synatn(tmp_pattern,single_pattern,use_synant), ed_min)
         if ed_sum/len(single_event)/len(single_pattern)<=0.5:
         #if ed_min/len(single_pattern[0])<0.5:
             event_list[i].append(single_pattern)

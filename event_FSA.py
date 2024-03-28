@@ -13,9 +13,9 @@ if __name__ == '__main__':
         log_ = read_file(log_path+'/'+date+'/all.log')
         log_data.extend(log_)
     print(f'##Read total {len(log_data)} num of logs##')
-    log_path_list=['/mnt/e/obiwan/SNIC Log/1st','/mnt/e/obiwan/SNIC Log/2nd','../1st_example_log']
+    '''log_path_list=['/mnt/e/obiwan/SNIC Log/1st','/mnt/e/obiwan/SNIC Log/2nd','../1st_example_log']
     for log_path_ in log_path_list:
-        log_data.extend(read_log_files(log_path_))
+        log_data.extend(read_log_files(log_path_))'''
     log_dict, synant_dict=make_dict(log_data)
     log_patterns=make_log_pattern_dict(log_data, log_dict)
     event_list=classify_pattern_to_events(log_patterns,synant_dict)
@@ -41,7 +41,7 @@ if __name__ == '__main__':
                 delta['q'+str(prev_event_num)][str(event_num)]='q'+str(event_num)
             prev_event_num=event_num
         #print(delta)
-    for log_path_ in log_path_list:
+    '''for log_path_ in log_path_list:
         prev_event_num=0
         log_data_=read_log_files(log_path_)
         for single_log in log_data_:
@@ -53,9 +53,9 @@ if __name__ == '__main__':
                 delta['q'+str(event_num)]={}
             if not str(event_num) in delta['q'+str(prev_event_num)]:
                 delta['q'+str(prev_event_num)][str(event_num)]='q'+str(event_num)
-            prev_event_num=event_num
+            prev_event_num=event_num'''
     automata1 = DFA(Q, sigma, delta, initialState, F)
-    automata1.view("DFA_for_all")
+    #automata1.view("DFA_for_all")
     data=((log_dict, synant_dict, log_patterns,event_list),(Q, sigma, delta, initialState, F))
     print(f'Save logs events to event_list.txt')
     with open('evnet_list.txt', 'w') as f:

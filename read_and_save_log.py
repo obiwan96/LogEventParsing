@@ -2,6 +2,7 @@ from log_parser_lib import *
 import os
 import string
 import re
+import pickle as pkl
 
 if __name__ == '__main__':
     translator = str.maketrans(string.punctuation.replace('/',''), ' '*(len(string.punctuation)-1))
@@ -17,13 +18,15 @@ if __name__ == '__main__':
     log_dict, synant_dict=make_dict(log_data)
     log_patterns=make_log_pattern_dict(log_data, log_dict)
     event_list=classify_pattern_to_events(log_patterns,synant_dict)
-    print(f'Save logs events')
-    with open(log_path+'/'+'evnet_list.txt', 'w') as f:
+    with open(log_path+'/'+'event_list.pkl','wb')as f:
+        pkl.dump(event_list, f)
+    with open(log_path+'/'+'event_list.txt', 'w') as f:
         for i, single_event in enumerate(event_list):
             f.write('-------------------------------------------------------------'+'\n')
             f.write(str(i+1)+'\n')
             for single_pattern in single_event:
                 f.write(' '.join(single_pattern)+'\n')
+    print(f'Save logs events')
     new_log_path='../log_dpnm_tb/after_preprocessing'
     for date in date_list:
         log_list=[]

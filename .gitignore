@@ -11,3 +11,5 @@ log_dpnm_tb/
 !DFA/
 DFA/*
 !DFA/DFA_for_all.gv.png
+example.csv
+.ipynb_checkpoints/

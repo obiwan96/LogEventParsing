@@ -26,6 +26,8 @@ We will use log event parser to detect anomaly logs in logs.
         : Anomaly Detection Module
      - module_test.py
         : Test the Anomaly Detection Module
+     - tf-idf ~ .ipynb
+        : Log-TF-IDF based AD experiments file
 
     
 ex)
