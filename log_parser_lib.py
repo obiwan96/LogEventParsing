@@ -44,6 +44,8 @@ def read_file(file):
                 return []
     log_data=[]
     for sentence in text.split('\n'):
+        if len(sentence)==0 or sentence in ['\n','\r\n']:
+            continue
         #print(sentence)
         single_log={}
         try:
@@ -264,7 +266,7 @@ def classify_pattern_to_events(log_patterns, use_synant=None,print_resuts=False)
     return event_list
 
 def put_new_pattern_to_event_list(single_pattern, event_list, use_synant=None):
-    edit_algo=lambda x,y:edit_dist_synatn(x,y,use_synant) if use_synant else edit_dist
+    edit_algo=lambda x,y:edit_dist_synatn(x,y,use_synant) if use_synant else edit_dist(x,y)
     find_event=False
     for i, single_event in enumerate(event_list):
         ed_sum=0
