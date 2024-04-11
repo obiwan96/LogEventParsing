@@ -155,6 +155,7 @@ def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list,
         event_num=find_event_num(single_pattern,event_list)
         if event_num == None:
             # Unseen Log Pattern!
+            print('unseen log pattern')
             log_patterns.append([single_pattern, 1])
             tf_idf.append(ln(ln(num_all_log)*(num_all_doc+2)))
             assert(len(log_patterns)==len(tf_idf))
@@ -162,6 +163,7 @@ def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list,
             if find_event:
                 event_num=find_event_num(single_pattern,event_list)
             else:
+                print('unseen log event')
                 # Unseen Event! Make new event
                 event_list.append([single_pattern])
                 event_num=len(event_list)
@@ -188,6 +190,9 @@ def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list,
         if not any(isinstance(value, str) for value in new_row.values()):
             ab_df.loc[index] = new_row
         ab_df=ab_df[ab_df['tf_idf'].apply(lambda x: not isinstance(x,str))]
+        recent_event_nums.append([date_now, event_num])
+        if event_num<=ori_all_event_num:
+            model_input.append(event_num-1)
     return ab_df
 
 def anomaly_detection_for_file(single_log_data,log_patterns, event_list, tf_idf, synant_dict=None, threshold=[15,2], way='repeat'):
