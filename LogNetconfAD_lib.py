@@ -13,7 +13,7 @@ import datetime
 
 class HeavyRNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
-        super(SimpleRNN, self).__init__()
+        super(HeavyRNN, self).__init__()
         self.rnn = nn.RNN(input_size, hidden_size*2,batch_first=True)
         self.fc1 = nn.Linear(hidden_size*2, hidden_size)
         self.fc2 = nn.Linear(hidden_size, input_size)
