@@ -59,7 +59,7 @@ def calculate_tf_idf(log_data, log_patterns):
     for i in range(len(tf_idf)):
         tf.append(ln(num_all_log/(1+log_patterns[i][1])))
         idf.append(num_all_doc/(1+tf_idf[i]))
-        tf_idf[i]=sqrt(tf[i]*idf[i])
+        tf_idf[i]=ln(tf[i]*idf[i])
     print(f'tf-idf of all patterns are calculated')
     print(f'averagae of tf-idf is {sum(tf_idf)/len(tf_idf)} and std is {sum((tf_idf[i]-sum(tf_idf)/len(tf_idf))**2 for i in range(len(tf_idf)))/len(tf_idf)}, max is {max(tf_idf)}, min is {min(tf_idf)}')
     print(f'average of tf is {sum(tf)/len(tf)} and std is {sum((tf[i]-sum(tf)/len(tf))**2 for i in range(len(tf)))/len(tf)} and max is {max(tf)} and min is {min(tf)}')
@@ -135,8 +135,8 @@ def calculate_abnormal_score_for_files(log_data,log_patterns, event_list, tf_idf
 def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list, tf_idf, num_all_doc, synant_dict=None):
     # Now, log_data is DataFrame that has all log data
     # and it's row is datetime.
-    event_pred_model=torch.load('../model/eventnum50_input10_acc99_transform.pt')
-    event_pred_model.load_state_dict(torch.load('../model/eventnum50_input10_acc99_transform_state_dict.pt'))
+    event_pred_model=torch.load('model/eventnum50_input10_acc99_transform.pt')
+    event_pred_model.load_state_dict(torch.load('model/eventnum50_input10_acc99_transform_state_dict.pt'))
     event_pred_model.eval()
     num_all_log=len(log_data)
     ori_all_event_num=len(event_list)
