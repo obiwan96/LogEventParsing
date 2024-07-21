@@ -49,7 +49,7 @@ def read_file(file):
         #print(sentence)
         single_log={}
         try:
-            single_log['date']=datetime.strptime(sentence[:15], "%b %d %H:%M:%S")
+            single_log['date']=datetime.strptime(sentence[:15], "%b %d %H:%M:%S").replace(year=2024)
         except:
             # Previous log is continueing
             log_data[-1]['log']+=sentence
@@ -292,7 +292,10 @@ def find_event_num(single_pattern,event_list):
     for event_num, single_event in enumerate(event_list):
         for pattern_elem in single_event:
             if pattern_elem==single_pattern:
+                if event_num+1==0:
+                    print('event num is 0')
                 return event_num+1
+    return None
 
 if __name__ == "__main__":
     log_data=read_log_files()
