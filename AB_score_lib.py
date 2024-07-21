@@ -293,7 +293,7 @@ def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list,
     event_pred_model.eval()
     #num_all_log=len(log_data)
     ori_all_event_num=len(event_list)
-    print(ori_all_event_num)
+    #print(ori_all_event_num)
     occurrence_prob_list=[]
     repeat_rate_list=[]
     abnormal_score_list=[]

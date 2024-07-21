@@ -90,12 +90,20 @@ def read_data(file_path):
         all_log=[]
         for file in log_file_list:
             if os.path.exists(log_file_path+'/'+file+'/'+date):
+                if file =='1st':
+                    dir_list_=os.listdir(log_file_path+'/'+file+'/'+date)
+                    for dir_name in dir_list_:
+                        file_list_=os.listdir(log_file_path+'/'+file+'/'+date+'/'+dir_name)
+                        for file_name_ in file_list_:
+                            log_=read_file(log_file_path+'/'+file+'/'+date+'/'+dir_name+'/'+file_name_)
+                            all_log.extend(log_)
                 file_list_=os.listdir(log_file_path+'/'+file+'/'+date)
                 for file_name_ in file_list_:
                     log_=read_file(log_file_path+'/'+file+'/'+date+'/'+file_name_)
                     all_log.extend(log_)
             all_log=sorted(all_log, key=lambda x:x['date'])
             tmp_data['log']=all_log
+            #print(all_log)
         
         # read netconf data
         netconf_data=pd.DataFrame()
@@ -113,7 +121,8 @@ def read_data(file_path):
             netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=0)
             tmp_netconf_data, _ =read_netconf_data(netconf_data_path, (date_month, date_day), 'juniper')
             netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=0)
-        tmp_data['netconf']=netconf_data
+        tmp_data['netconf']=netconf_data.transpose()
+        print(netconf_data.index, netconf_data.columns)
         data[date]=tmp_data
     print(f'{len(date_list)} num of date readed')
     return data

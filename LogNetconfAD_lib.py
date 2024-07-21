@@ -190,12 +190,12 @@ def AD(normal_data, abnormal_data, log_dict, log_patterns, event_list, tf_idf, n
     y_data=[]
     input_feature_num=0
     for date in normal_data.keys():
+        print(date)
+        #print(normal_data[date]['log'])
         #mon=int(date[:2])
         #day=int(date[3:])
         log_df=pd.DataFrame(normal_data[date]['log'])
-        print(log_df.shape)
-        print(log_df.columns)
-
+        
         #log_df['date']=log_df['date'].apply(lambda x: x.replace(year=2024, month=mon, day=day))
         log_df.set_index('date', inplace=True)
         tf_idf_results=calculate_abnormal_score_for_df(log_df,log_dict, log_patterns, event_list, 
@@ -219,7 +219,8 @@ def AD(normal_data, abnormal_data, log_dict, log_patterns, event_list, tf_idf, n
         log_df.set_index('date', inplace=True)
         tf_idf_results=calculate_abnormal_score_for_df(log_df,log_dict, log_patterns, event_list, 
                             tf_idf, num_all_doc, num_all_log, event_pred_model, synant_dict)
-        for column_name, cloumn in abnormal_data[date]['netconf'].items():
+        for column_name in abnormal_data[date]['netconf'].columns:
+            print(column_name)
             tf_idf_results['average_'+column_name]=tf_idf_results.apply(
                 lambda row: calculate_average_values(row, abnormal_data, column_name, 10), axis=1)
             tf_idf_results.fillna(0, inplace=True)
