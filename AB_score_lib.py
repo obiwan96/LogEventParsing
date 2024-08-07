@@ -154,12 +154,11 @@ def event_prediction_model_training(log_data, log_dict, event_list, model_type='
             for batch in test_dataloader:
                 x,y=batch
                 x=x.to(device)
-                y=y.to(device)
                 with torch.no_grad():
                     prediction=model(x)
                 #all_preds +=torch.argmax(prediction,dim=1)
                 all_preds += torch.topk(prediction.cpu(),topk_num,dim=1)[1]
-                all_labels += y.cpu()
+                all_labels += y
             all_preds = torch.stack(all_preds).numpy()
             all_labels = torch.stack(all_labels).numpy()
             assert len(all_preds)==len(all_labels)
@@ -210,6 +209,14 @@ def calculate_tf_idf(log_data, log_dict, log_patterns):
     print(f'averagae of tf-idf is {sum(tf_idf)/len(tf_idf)} and std is {sum((tf_idf[i]-sum(tf_idf)/len(tf_idf))**2 for i in range(len(tf_idf)))/len(tf_idf)}, max is {max(tf_idf)}, min is {min(tf_idf)}')
     print(f'average of tf is {sum(tf)/len(tf)} and std is {sum((tf[i]-sum(tf)/len(tf))**2 for i in range(len(tf)))/len(tf)} and max is {max(tf)} and min is {min(tf)}')
     print(f'average of idf is {sum(idf)/len(idf)} and std is {sum((idf[i]-sum(idf)/len(idf))**2 for i in range(len(idf)))/len(idf)} and max is {max(idf)} and min is {min(idf)}')
+    x=range(len(tf_idf))
+    plt.plot(x, tf, '--', label='tf')
+    plt.plot(x, idf, '-', label='idf')
+    plt.plot(x, tf_idf, ':', label='tf-idf')
+    plt.legend()
+    plt.xlabel('log pattern num.')
+    plt.savefig('../results/tf_idf_result.png')
+    plt.clf()
     return tf_idf, num_all_doc, num_all_log
 
 def calculate_abnormal_score_for_files(log_data,log_dict, log_patterns, event_list, 
@@ -223,19 +230,27 @@ def calculate_abnormal_score_for_files(log_data,log_dict, log_patterns, event_li
     ori_all_event_num=len(event_list)
     print(ori_all_event_num)
     #num_all_doc=len(log_data)+2
-    occurrence_prob_list=[]
-    repeat_rate_list=[]
-    abnormal_score_list=[]
-    tf_idf_list=[]
+    occurrence_prob_list={}
+    repeat_rate_list={}
+    abnormal_score_list={}
+    tf_idf_list={}
 
     input_dim=10
-    for single_file_data in tqdm(log_data):
+    total_num=0
+    exceed_threshold=0
+    threshold=20
+    for date in tqdm(log_data.keys()):
         model_input=[]
         #event_num=find_event_num(log_parser(single_file_data[0],log_dict),event_list)
         #model_input.append(event_num)
         #date_now=single_file_data[0]['date']
         #recent_event_nums=[[date_now,event_num]]
         recent_event_nums=[]
+        single_occurrence_prob_list=[]
+        single_repeat_rate_list=[]
+        single_abnormal_score_list=[]
+        single_tf_idf_list=[]
+        single_file_data = log_data[date]['log']
         for single_log in single_file_data:
             single_pattern=log_parser(single_log, log_dict)
             date_now=single_log['date']
@@ -270,18 +285,30 @@ def calculate_abnormal_score_for_files(log_data,log_dict, log_patterns, event_li
             reapeat_rate=ln((len([x for x in recent_event_nums if x[1]==event_num])+2))
             
             abnormal_score=tf_idf[find_pattern_num(single_pattern,log_patterns)-1]*(1-occurence_probability)*reapeat_rate
-            tf_idf_list.append(tf_idf[find_pattern_num(single_pattern,log_patterns)-1])
-            occurrence_prob_list.append(occurence_probability)
-            repeat_rate_list.append(reapeat_rate)
-            abnormal_score_list.append(abnormal_score)
+            single_tf_idf_list.append(tf_idf[find_pattern_num(single_pattern,log_patterns)-1])
+            single_occurrence_prob_list.append(occurence_probability)
+            single_repeat_rate_list.append(reapeat_rate)
+            single_abnormal_score_list.append(abnormal_score)
+            total_num+=1
+            if abnormal_score > threshold:
+                exceed_threshold+=1
             # Update recent_event_nums and etc
             recent_event_nums.append([date_now, event_num])
             if event_num<=ori_all_event_num:
                 model_input.append(event_num-1)
-    print(f'average of occurence_probability is {np.average(occurrence_prob_list)} and std is {np.std(occurrence_prob_list)} and max is {np.max(occurrence_prob_list)} and min is {np.min(occurrence_prob_list)}')
-    print(f'average of repeat_rate is {np.average(repeat_rate_list)} and std is {np.std(repeat_rate_list)} and max is {np.max(repeat_rate_list)} and min is {np.min(repeat_rate_list)}')
-    print(f'average of abnormal_score is {np.average(abnormal_score_list)} and std is {np.std(abnormal_score_list)} and max is {np.max(abnormal_score_list)} and min is {np.min(abnormal_score_list)}')
-    print(f'average of tf_idf is {np.average(tf_idf_list)} and std is {np.std(tf_idf_list)} and max is {np.max(tf_idf_list)} and min is {np.min(tf_idf_list)}')
+        occurrence_prob_list[date]=single_occurrence_prob_list
+        repeat_rate_list[date]=single_repeat_rate_list
+        abnormal_score_list[date]=single_abnormal_score_list
+        tf_idf_list[date]=single_tf_idf_list
+    all_occ=[item for sublist in occurrence_prob_list.values() for item in sublist]
+    all_rep=[item for sublist in repeat_rate_list.values() for item in sublist]
+    all_ab=[item for sublist in abnormal_score_list.values() for item in sublist]
+    all_tf=[item for sublist in tf_idf_list.values() for item in sublist]
+    print(f'average of occurence_probability is {np.average(all_occ)} and std is {np.std(all_occ)} and max is {np.max(all_occ)} and min is {np.min(all_occ)}')
+    print(f'average of repeat_rate is {np.average(all_rep)} and std is {np.std(all_rep)} and max is {np.max(all_rep)} and min is {np.min(all_rep)}')
+    print(f'average of tf_idf is {np.average(all_tf)} and std is {np.std(all_tf)} and max is {np.max(all_tf)} and min is {np.min(all_tf)}')
+    print(f'average of abnormal_score is {np.average(all_ab)} and std is {np.std(all_ab)} and max is {np.max(all_ab)} and min is {np.min(all_ab)}')
+    print(f'{exceed_threshold} number of logs exceed threshold {threshold} among {total_num} logs')
     return occurrence_prob_list, repeat_rate_list, abnormal_score_list, tf_idf_list
 
 def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list, tf_idf, num_all_doc, num_all_log, event_pred_model, synant_dict=None):
@@ -308,7 +335,7 @@ def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list,
         event_num=find_event_num(single_pattern,event_list)
         if event_num == None:
             # Unseen Log Pattern!
-            print('unseen log pattern')
+            #print('unseen log pattern')
             log_patterns.append([single_pattern, 1])
             tf_idf.append(ln(ln(num_all_log)*(num_all_doc+2)))
             assert(len(log_patterns)==len(tf_idf))
@@ -316,7 +343,7 @@ def calculate_abnormal_score_for_df(log_data, log_dict,log_patterns, event_list,
             if find_event:
                 event_num=find_event_num(single_pattern,event_list)
             else:
-                print('unseen log event')
+                #print('unseen log event')
                 # Unseen Event! Make new event
                 event_list.append([single_pattern])
                 event_num=len(event_list)
@@ -354,6 +381,7 @@ def anomaly_detection_for_file(single_log_data, log_dict, log_patterns, event_li
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     #num_all_log=sum(single_log[1] for single_log in log_patterns)
     ori_all_event_num=len(event_list)
+    #print(ori_all_event_num)
     #print(ori_all_event_num)
     #num_all_doc=len(log_data)+2
     recent_abnormal_score=[]

@@ -26,6 +26,7 @@ def json_read_content(file_name, switch_type):
     with open(file_name) as f:
         json_data=json.load(f)
     if switch_type=='cisco':
+        del json_data['time']
         key_list=list(json_data.keys())
         #print(key_list)
         for key in key_list:
@@ -68,9 +69,11 @@ def read_netconf_data(file_path, date, switch_type):
             continue
         file_date=json_date_parsing(file)
         if file_date.month==date_month and file_date.day==date_day:
+            tmp_data=pd.Series(json_read_content(file_path+'/'+switch_type+'/'+file, switch_type), name=file_date)
             find_file=True
-            data=pd.concat([data, pd.Series(json_read_content(file_path+'/'+switch_type+'/'+file, switch_type), name=file_date)])
-    return data, find_file
+            data=(tmp_data if data.empty else pd.concat([data, tmp_data], axis=1))
+    #print(data.index.tolist())
+    return data.transpose(), find_file
 
 def read_data(file_path):
     log_file_path=file_path+'/log_netconf/log'
@@ -84,7 +87,8 @@ def read_data(file_path):
     date_list=list(set(date_list))
     print(date_list)
     data={}
-    for date in date_list[:1]:
+    whole_netconf_features=[]
+    for date in date_list:
         # read log data
         tmp_data={'log':[], 'netconf':[]}
         all_log=[]
@@ -112,35 +116,44 @@ def read_data(file_path):
 
         # Cisco
         tmp_netconf_data, find_file_1=read_netconf_data(netconf_file_path, (date_month, date_day), 'cisco')
-        netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=0)
+        netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=1)
         # Juniper
         tmp_netconf_data, find_file_2=read_netconf_data(netconf_file_path, (date_month, date_day), 'juniper')
-        netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=0)
+        netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=1)
         if not find_file_1 and not find_file_2:
             tmp_netconf_data, _ =read_netconf_data(netconf_data_path, (date_month, date_day), 'cisco')
-            netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=0)
+            netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=1)
             tmp_netconf_data, _ =read_netconf_data(netconf_data_path, (date_month, date_day), 'juniper')
-            netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=0)
-        tmp_data['netconf']=netconf_data.transpose()
-        print(netconf_data.index, netconf_data.columns)
+            netconf_data=pd.concat([netconf_data, tmp_netconf_data], axis=1)
+        #print(netconf_data.columns.tolist())
+        tmp_data['netconf']=netconf_data
         data[date]=tmp_data
+        whole_netconf_features.extend(netconf_data.columns.tolist())
     print(f'{len(date_list)} num of date readed')
-    return data
+    return data, list(set(whole_netconf_features))
 
 if __name__ == '__main__':
     loading_dict_data=True
     loading_model=True
+    calculate_ab_score=False
     test_ab_score=False
-    model_path='../model/eventnum302_input10_acc94_transformer'
+    loading_AD_data=True
+
+    model_path='../model/eventnum313_input10_acc93_transformer'
     normal_log_path='../normal_data'
     abnormal_log_path='../overloaded_data'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    print('normal data read')
-    normal_data=read_data(normal_log_path)
-    print('abnormal data read')
-    abnormal_data=read_data(abnormal_log_path)
+    if not loading_dict_data or not loading_model or not loading_AD_data or test_ab_score or calculate_ab_score: 
+        print('rading log and NETCONF data')
+        print('normal data read')
+        normal_data, whole_netconf_features=read_data(normal_log_path)
+        print('abnormal data read')
+        abnormal_data, netconf_features =read_data(abnormal_log_path)
+        whole_netconf_features.extend(netconf_features)
+        whole_netconf_features=list(set(whole_netconf_features))
+        print(f'whole netconf features are {len(whole_netconf_features)}')
 
     # Make Log Dictionary
 
@@ -170,8 +183,10 @@ if __name__ == '__main__':
         with open('tf_data.pkl','wb') as f:
             pkl.dump(data,f)
         del normal_log_data
+    ori_event_list=[x[:] for x in event_list]
 
     # Load Event Prediction Model or Train the model
+    # After training, calculate and plot the abnormal score for each log file
     if loading_model:
         # Load model
         event_pred_model=torch.load(model_path+'.pt')
@@ -184,40 +199,60 @@ if __name__ == '__main__':
         event_pred_model = event_prediction_model_training(normal_log_data, log_dict, event_list,n_epochs=500,reducing_rate=20,learning_rate=0.1)
         del normal_log_data
     
-    normal_log_data=[normal_data[date]['log'] for date in normal_data.keys()]
-    abnormal_log_data=[abnormal_data[date]['log'] for date in abnormal_data.keys()]
-    '''
-    occurrence_porb_list, repeat_rate_list, abnormal_score_list, tf_idf_list = calculate_abnormal_score_for_files(normal_log_data, 
-        log_dict, log_patterns, event_list, tf_idf, num_all_docs, num_all_log, event_pred_model)
-    plt.scatter([x for x in range(len(abnormal_score_list))], abnormal_score_list, s=0.1)
-    plt.savefig('../results/normal_data_abnormal_score.png')
-    plt.clf()
-    plt.scatter([x for x in range(len(occurrence_porb_list))], occurrence_porb_list, s=0.1)
-    plt.savefig('../results/normal_data_occurrence_probability.png')
-    plt.clf()
-    plt.scatter([x for x in range(len(tf_idf_list))], tf_idf_list, s=0.1)
-    plt.savefig('../results/normal_data_tf_idf.png')
-    print('plot saved')
-    plt.clf()
+    if calculate_ab_score:
+        #normal_log_data=[normal_data[date]['log'] for date in normal_data.keys()]
+        #abnormal_log_data=[abnormal_data[date]['log'] for date in abnormal_data.keys()]
+        
+        occurrence_porb_list, repeat_rate_list, abnormal_score_list, tf_idf_list = calculate_abnormal_score_for_files(normal_data, 
+            log_dict, log_patterns, event_list, tf_idf, num_all_docs, num_all_log, event_pred_model)
+        plt.xlabel('Date')
+        plt.ylabel('Values')
+        x=[]
+        y=[]
+        for i, date_ in enumerate(normal_data.keys()):
+            x.extend([i]*len(abnormal_score_list[date_]))
+            y.extend(abnormal_score_list[date_])
+        plt.scatter(x,y)
+        #plt.scatter([x for x in range(len(abnormal_score_list))], abnormal_score_list, s=0.1)
+        plt.savefig('../results/normal_data_abnormal_score.png')
+        plt.clf()
+        '''plt.scatter([x for x in range(len(occurrence_porb_list))], occurrence_porb_list, s=0.1)
+        plt.savefig('../results/normal_data_occurrence_probability.png')
+        plt.clf()
+        plt.scatter([x for x in range(len(tf_idf_list))], tf_idf_list, s=0.1)
+        plt.savefig('../results/normal_data_tf_idf.png')
+        plt.clf()'''
+        print('normal ab score plot saved')
 
-    occurrence_porb_list, repeat_rate_list, abnormal_score_list, tf_idf_list = calculate_abnormal_score_for_files(abnormal_log_data, 
-        log_dict, log_patterns, event_list, tf_idf, num_all_docs, num_all_log, event_pred_model)
-    plt.scatter([x for x in range(len(abnormal_score_list))], abnormal_score_list, s=0.1)
-    plt.savefig('../results/abnormal_data_abnormal_score.png')
-    plt.clf()
-    plt.scatter([x for x in range(len(occurrence_porb_list))], occurrence_porb_list, s=0.1)
-    plt.savefig('../results/abnormal_data_occurrence_probability.png')
-    plt.clf()
-    plt.scatter([x for x in range(len(tf_idf_list))], tf_idf_list, s=0.1)
-    plt.savefig('../results/abnormal_data_tf_idf.png')
-    plt.clf()
-    print('plot saved')'''
+        occurrence_porb_list, repeat_rate_list, abnormal_score_list, tf_idf_list = calculate_abnormal_score_for_files(abnormal_data, 
+            log_dict, log_patterns, event_list, tf_idf, num_all_docs, num_all_log, event_pred_model)
+        plt.xlabel('Date')
+        plt.ylabel('Values')
+        x=[]
+        y=[]
+        for i, date_ in enumerate(abnormal_data.keys()):
+            x.extend([i]*len(abnormal_score_list[date_]))
+            y.extend(abnormal_score_list[date_])
+        plt.scatter(x,y)
+        #plt.scatter([x for x in range(len(abnormal_score_list))], abnormal_score_list, s=0.1)
+        plt.savefig('../results/abnormal_data_abnormal_score.png')
+        plt.clf()
+        '''plt.scatter([x for x in range(len(occurrence_porb_list))], occurrence_porb_list, s=0.1)
+        plt.savefig('../results/abnormal_data_occurrence_probability.png')
+        plt.clf()
+        plt.scatter([x for x in range(len(tf_idf_list))], tf_idf_list, s=0.1)
+        plt.savefig('../results/abnormal_data_tf_idf.png')
+        plt.clf()'''
+        print('abnormal ab score plot saved')
 
     #Test f1 score with AB score only
     if test_ab_score:
+        normal_log_data=[normal_data[date]['log'] for date in normal_data.keys()]
+        abnormal_log_data=[abnormal_data[date]['log'] for date in abnormal_data.keys()]
         # Test Repeat based
+        print('Test Repeat based AB score Anomaly Detection')
         ori_event_list=[x[:] for x in event_list]
-        '''f1_data={}
+        f1_data={}
         repeat_index=[1, 2, 3, 5,7,10]
         for i in [12,11, 10, 9,8,7,6,5]:
             print(f'single threshold is {i}')
@@ -252,9 +287,10 @@ if __name__ == '__main__':
         sns_fig = sns.heatmap(df, annot=True, cmap='Blues')
         fig=sns_fig.get_figure()
         fig.savefig('../results/ABonly_repeatbase_heatmap.png')
-        plt.clf()'''
+        plt.clf()
         
         # Test Time based
+        print('Test Time based AB score Anomaly Detection')
         f1_data={}
         time_index=[0.5, 1, 3, 5,10,20]
         for i in [12, 11, 10, 9,8,7,6,5,4]:
@@ -290,93 +326,54 @@ if __name__ == '__main__':
         sns_fig = sns.heatmap(df, annot=True, cmap='Blues')
         fig=sns_fig.get_figure()
         fig.savefig('../results/ABonly_timebase_heatmap.png')
+        plt.clf()
 
-    AD(normal_data, abnormal_data, log_dict, log_patterns, event_list, tf_idf, num_all_docs, num_all_log, event_pred_model, synant_dict)
+    # Test RNN model with AB score and NETCONF
+    if loading_AD_data:
+        with open('AD_data.pkl', 'rb') as f:
+            ad_data=pkl.load(f)
+        x_data, y_data = ad_data
+        x_normal=pd.concat(([x_data[i] for i in range(len(y_data)) if not y_data[i]]))
+        input_feature_num=len(ad_data[0][0].columns)
+        #print(input_feature_num)
+    else:
+        event_list=[x[:] for x in ori_event_list]
+        ad_data = Make_data_for_AD(normal_data, abnormal_data, log_dict, log_patterns, event_list, 
+            tf_idf, num_all_docs, num_all_log, event_pred_model, whole_netconf_features, synant_dict)
+        with open('AD_data.pkl','wb') as f:
+            pkl.dump(ad_data,f)
+        print('AD data saved')
+    dataloader = seperate_data(ad_data, input_feature_num, batch_size=40)
 
-    log_data=[]
-    norm_num=0
-    date_list=os.listdir(normal_log_path)
-    for date in date_list:
-        if os.path.isfile(normal_log_path+'/'+date):
-            continue
-        log_=read_file(normal_log_path+'/'+date+'/all.log')
-        if log_:
-            log_data.append(log_)
-            norm_num+=1
-    print(f'{norm_num} of normal data readed')
-    assert(norm_num==len(log_data))
-                
-    # add all value in log_patterns dictionary
-    num_all_log=sum(single_log[1] for single_log in log_patterns)
-    num_all_doc=len(log_data)
+    losses_trans, f1_trans = AD(dataloader, input_feature_num, 'transformer', lr=0.0001)
+    losses_simple, f1_simple = AD(dataloader, input_feature_num, 'simple')
+    losses_lstm, f1_lstm = AD(dataloader, input_feature_num, 'lstm', lr=0.007)
+    losses_heavy, f1_heavy = AD(dataloader, input_feature_num, 'heavy' )
 
-    # let's calcurate tf-idf of all patterns
-    tf_idf=[0 for _ in range(len(log_patterns))]
-    for single_file_data in log_data:
-        tmp_df=[False for _ in range(len(log_patterns))]
-        for single_log in single_file_data[0]:
-            single_pattern=log_parser(single_log, log_dict)
-            if single_pattern==[]:continue
-            tmp_df[find_pattern_num(single_pattern,log_patterns)-1]=True
-        for i in range(len(tmp_df)):
-            if tmp_df[i]:
-                tf_idf[i]+=1
-    tf=[]
-    idf=[]
-    for i in range(len(tf_idf)):
-        tf.append(num_all_log/(1+log_patterns[i][1]))
-        idf.append(num_all_doc/(1+tf_idf[i]))
-        tf_idf[i]=ln(ln(num_all_log/(1+log_patterns[i][1]))*num_all_doc/(1+tf_idf[i])+1)
-    print(f'tf-idf of all patterns are calculated')
-    print(f'averagae of tf-idf is {sum(tf_idf)/len(tf_idf)} and std is {sum((tf_idf[i]-sum(tf_idf)/len(tf_idf))**2 for i in range(len(tf_idf)))/len(tf_idf)}')
-    print(f'average of tf is {sum(tf)/len(tf)} and std is {sum((tf[i]-sum(tf)/len(tf))**2 for i in range(len(tf)))/len(tf)} and max is {max(tf)} and min is {min(tf)}')
-    print(f'average of idf is {sum(idf)/len(idf)} and std is {sum((idf[i]-sum(idf)/len(idf))**2 for i in range(len(idf)))/len(idf)} and max is {max(idf)} and min is {min(idf)}')
+    # plot losses graph for four model
+    epoches=[i*50 for i in range(800/50)]
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Epoches')
+    ax.set_ylabel('Losses')
+    plt.plot(epoches, losses_simple, label='simple_RNN')
+    plt.plot(epoches, losses_heavy, label='heavy_RNN')
+    plt.plot(epoches, losses_lstm, label='LSTM')
+    plt.plot(epoches, losses_trans, label='Transformer')
+    plt.legend()
+    plt.savefig('../results/AD_losses_compare.png')
+    plt.clf()
 
-    # Loading Models
-    event_pred_model=torch.load('../model/eventnum50_input10_acc93.pt')
-    event_pred_model.load_state_dict(torch.load('../model/eventnum50_input10_acc93_state_dict.pt'))
-    event_pred_model.eval()
+    # plot f1 score graph for four model
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Epoches')
+    ax.set_ylabel('F1 Score')
+    plt.plot(epoches, f1_simple, label='simple_RNN')
+    plt.plot(epoches, f1_heavy, label='heavy_RNN')
+    plt.plot(epoches, f1_lstm, label='LSTM')
+    plt.plot(epoches, f1_trans, label='Transformer')
+    plt.legend()
+    plt.savefig('../results/AD_f1s_compare.png')
+    plt.clf()
+                                   
+                                   
 
-    # Calculate occurence_probability and repeat_rate
-    occurrence_porb_list=[]
-    repeat_rate_list=[]
-    abnormal_score_list=[]
-    for file_num, single_file_data in enumerate(log_data):
-        print(f'processing {file_num+1}th file of {len(log_data)} num of files')
-        model_input=[]
-        prev_event_num=find_event_num(log_parser(single_file_data[0],log_dict),event_list)
-        model_input.append(prev_event_num)
-        date_now=single_file_data[0]['date']
-        recent_event_nums=[[date_now,prev_event_num]]
-        for single_log in single_file_data[1:]:
-            single_pattern=log_parser(single_log, log_dict)
-            date_now=single_log['date']
-            if single_pattern==[]:continue            
-            event_num=find_event_num(single_pattern,event_list)
-            # Event Prediction (LSTM) calculate
-            if len(model_input)==input_dim:
-                input_data=torch.tensor([model_input[:]],dtype=torch.float32)
-                with torch.no_grad():
-                    prediction=event_pred_model(input_data)
-                occurence_probability=np.exp(prediction[0][prev_event_num-1].item())
-                model_input.pop(0)
-            else:
-                occurence_probability=1
-            # Repeat Rate calculate
-            recent_event_nums=[x for x in recent_event_nums if x[0]>date_now-timedelta(minutes=5)]
-            reapeat_rate=len([x for x in recent_event_nums if x[1]==event_num])
-            abnormal_score=tf_idf[find_pattern_num(single_pattern,log_patterns)-1]*occurence_probability*reapeat_rate
-
-            # Update recent_event_nums and etc
-            recent_event_nums.append([date_now, event_num])
-            prev_event_num=event_num
-            model_input.append(event_num)
-    # Calcurate average, std, max, min of occurence_probability with np
-    print(f'average of occurence_probability is {np.average(occurrence_porb_list)} and std is {np.std(occurrence_porb_list)} and max is {np.max(occurrence_porb_list)} and min is {np.min(occurrence_porb_list)}')
-    print(f'average of repeat_rate is {np.average(repeat_rate_list)} and std is {np.std(repeat_rate_list)} and max is {np.max(repeat_rate_list)} and min is {np.min(repeat_rate_list)}')
-    print(f'average of abnormal_score is {np.average(abnormal_score_list)} and std is {np.std(abnormal_score_list)} and max is {np.max(abnormal_score_list)} and min is {np.min(abnormal_score_list)}')
-    
-
-
-    #print(lstm_right, lstm_wrong)
-    #print(lstm_right/(lstm_right+lstm_wrong))
