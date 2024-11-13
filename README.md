@@ -23,9 +23,13 @@ We will use log event parser to detect anomaly logs in logs.
      - read_and_save_log.py
         : read logs and combine logs to 'all.log'
      - AD_module.py
-        : Anomaly Detection Module
+        : AB based Anomaly Detection Module
      - module_test.py
-        : Test the Anomaly Detection Module
+        : Test the AB based Anomaly Detection Module
+     - LogNetconfAD_lib.py
+        : Log and NETCONF based AD Module
+     - AD_with_TF.py
+        : Test the Log and NETCONF based AD Module
      - tf-idf ~ .ipynb
         : Log-TF-IDF based AD experiments file
 
